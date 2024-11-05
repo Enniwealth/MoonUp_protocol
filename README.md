@@ -69,6 +69,8 @@ The requirements for this audit are as follows:
 
 3. Security Review: Following the implementation of changes recommended in the initial audit, a follow-up review by the Guild Audit security team is requested to ensure that all updates have been accurately applied and that the protocol meets security standards.
 
+4. Focus and emphasis should also be on the market contracts. This is to ensure buy and sell runs smoothly throughout the protocol and ensure no discrepancies in fees gotten from user interaction on the protocol.
+
 ## Known Issues
 - SqrtX96 causing overflow
 - Invariant test case not fully implemented
