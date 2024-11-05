@@ -1,0 +1,24 @@
+==========================
+
+Chain 11155111
+
+Estimated gas price: 2.535590874 gwei
+
+Estimated total gas used for script: 4122164
+
+Estimated amount required: 0.010452121419531336 ETH
+
+==========================
+
+##### sepolia
+✅  [Success]Hash: 0x7f5eb18396a5910d5b3e1d8a9aac4424bc3ec3238c06c56e31a71ebde362aa56
+Contract Address: 0xd65cE0d9e6B0C3d40ECb3cAf6b35495DA39eb727
+Block: 6985907
+Paid: 0.00619677843297058 ETH (3172078 gas * 1.95353911 gwei)
+
+✅ Sequence #1 on sepolia | Total Paid: 0.00619677843297058 ETH (3172078 gas * avg 1.95353911 gwei)
+                                                                                                                                                                                    
+
+==========================
+
+ONCHAIN EXECUTION COMPLETE & SUCCESSFUL.
