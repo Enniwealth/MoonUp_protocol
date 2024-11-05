@@ -70,6 +70,27 @@ contract MoonUpBeaconFactory is UpgradeableBeacon {
         return address(new MoonUpMarket());
     }
 
+    /**
+     * @notice Deploys a new MoonUp proxy for a given token.
+     * @dev This function creates a new `MoonUpProxy` contract, passing encoded initialization parameters to the constructor.
+     * The proxy is linked to the calling contract (typically the factory) and initializes the `MoonUpMarket` with the
+     * provided settings to set up trading parameters and liquidity.
+     * @param token The address of the ERC20 token for which the liquidity pool is being created.
+     * @return moonUpProxy The address of the newly deployed `MoonUpProxy` contract.
+     * 
+     * Initialization Parameters:
+     * - `token`: The ERC20 token to be paired in the pool.
+     * - `weth`: The address of the WETH token used for pairing and liquidity.
+     * - `nonfungiblePositionManager`: The contract managing non-fungible positions for Uniswap V3.
+     * - `uniswapV3Factory`: The factory contract for Uniswap V3 pools.
+     * - `totalTradeVolume`: The initial total trade volume of the pool.
+     * - `TOTAL_TOKEN_SUPPLY`: The total supply of the token involved in the pool.
+     * - `PERCENTAGE_HOLDING_PER_USER`: The maximum allowable holding percentage per user.
+     * - `initialPrice`: The initial price at which the token is paired in the liquidity pool.
+     * 
+    * Returns:
+    * - `moonUpProxy`: The address of the newly created pool proxy.
+    */
     function deployPool(address token) internal returns (address moonUpProxy) {
        
         moonUpProxy = address(new MoonUpProxy(address(this), 
@@ -86,14 +107,30 @@ contract MoonUpBeaconFactory is UpgradeableBeacon {
             initialPrice
             )));
     }
-    /**
-     * @dev This function is responsible for creating tokens and their respective pairs. 
-     * It also interacts with buy function in pair contract if amounntMin != 0 to buy tokens
-     * @param name The is the name of the token to be created
-     * @param symbol Represents the symbol of the token to be created
-     * @param minExpected This is the minimum amount of tokens expected if creators want to buy
-     */
 
+    /**
+     * @notice Creates a new ERC20 token and its associated liquidity pool (pair).
+     * @dev This function deploys a new instance of the `MoonUpERC20` contract, creates a liquidity pool proxy for it,
+     * and optionally initiates a token purchase if `buy` is set to `true`. The function ensures that the sender 
+     * has provided enough ETH to cover the creation fee and optionally to buy tokens.
+     * @param name The name of the ERC20 token to be created.
+     * @param symbol The symbol representing the ERC20 token to be created.
+     * @param _metadataURI The URI pointing to the metadata associated with the token.
+     * @param minExpected The minimum amount of tokens the creator expects to receive when initiating a purchase.
+     * Only relevant if `buy` is `true`.
+     * @param buy A boolean indicating whether to use the remaining ETH (after the creation fee) to buy tokens
+     * from the newly created pair.
+     * @return moonupErc20 The address of the newly created ERC20 token contract.
+     * @return moonUpProxy The address of the newly deployed pool proxy associated with the token.
+     * 
+     * Requirements:
+     * - The caller must send at least `CREATION_FEE` in ETH to cover the creation cost.
+     * - If `buy` is `true`, the function calls the `buy` function on the proxy contract with the provided `minExpected` value.
+     * - The `buy` function call must succeed, or the transaction reverts.
+     * 
+     * Emits:
+     * - `MoonUpBeaconFactory__TokensCreated`: Emitted when the token and its associated proxy are successfully created.
+     */
 
     function createTokensAndPair(
         string memory name, 

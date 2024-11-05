@@ -45,7 +45,7 @@ contract MoonUpMarketTest is MoonUpBaseTest{
         vm.prank(alice);
         bytes memory expectedRevert = abi.encodeWithSelector(MoonUpMarket__CANNOT_BUY_MORE_THAN_3_PERCENT.selector);
         vm.expectRevert(expectedRevert);
-        IMoonUpMarketImplementation(MoonUpProxy).buy{value: 0.03 ether}(1);
+        IMoonUpMarketImplementation(MoonUpProxy).buy{value: 0.5 ether}(1);
     }
 
     function test_Revert_If_User_Sends_Zero_Eth() public {
@@ -59,7 +59,7 @@ contract MoonUpMarketTest is MoonUpBaseTest{
     function test_User_Can_Sell() public {
         //test if user can sell
         vm.prank(alice);
-        IMoonUpMarketImplementation(MoonUpProxy).buy{value: 0.003 ether}(1);
+        IMoonUpMarketImplementation(MoonUpProxy).buy{value: 0.1 ether}(1);
 
         vm.startPrank(alice);
         IERC20(MoonUpErc20).approve(MoonUpProxy, IERC20(MoonUpErc20).balanceOf(alice)); 

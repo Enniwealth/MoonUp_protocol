@@ -50,14 +50,14 @@ Contracts in scope: All files in
 Link: https://moonupmemes-organization.gitbook.io/moonup.meme
 
 
-```
-forge build
-```
-To run test, you will need to insert private key and your SEPOLIA_RPC_URL to the .env file.
+   ```
+   forge build
+   ```
+   To run test, you will need to insert private key and your SEPOLIA_RPC_URL to the .env file.
 
-```
-forge test -vvvvv
-```
+   ```
+   forge test -vvvvv
+   ```
 
 ## Additional Information For Audit
 

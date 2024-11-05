@@ -22,7 +22,6 @@ contract MoonUpMarket is UniswapInteraction {
     IERC20  public token;
     IWETH public weth;
     bool private isMarketOpen;
-    uint256 private totalEth;
     uint256 private total_Trade_Volume;
     address private uniswapFactory;
     address private nonfungiblePositionManager;
@@ -72,6 +71,38 @@ contract MoonUpMarket is UniswapInteraction {
         }
         _;
     }
+
+    /**
+     * @notice Allows users to purchase tokens from the market by sending ETH.
+     * @dev This function handles ETH-to-token transactions, calculates fees, ensures token availability, and manages refunds.
+     * It also updates market states and emits events related to purchases and market closures.
+     * @param minExpected The minimum amount of tokens the buyer expects to receive. The transaction reverts if this threshold is not met.
+     * 
+     * Requirements:
+     * - The `msg.value` (ETH sent with the transaction) must be greater than zero, otherwise the transaction reverts.
+     * - The factory call to transfer the fee must succeed.
+     * - The final token amount calculated must meet or exceed `minExpected` to avoid reverting.
+     * - The buyer's resulting balance must not exceed the `PERCENTAGE_HOLDING_PER_USER` threshold.
+     * - The market must be open (`isMarketOpen` should be true for this function to be callable).
+     * 
+     * Processes:
+     * 1. Calculates a 1% fee from `msg.value` and transfers it to the `factory`.
+     * 2. Calculates the number of tokens that can be bought with the remaining ETH after deducting the fee.
+     * 3. Ensures the number of tokens sold does not exceed the total trade volume.
+     * 4. Updates the buyer's balance and total ETH collected.
+     * 5. Checks if the purchase would cause the buyer to exceed their maximum allowable holding percentage.
+     * 6. Transfers tokens to the buyer and refunds any excess ETH if the token quote is less than `msg.value`.
+     * 
+     * Emits:
+     * - `Buy`: Emitted when a user successfully buys tokens, indicating the buyer's address, ETH spent, and tokens received.
+     * - `AmountGathered`: Emitted when the total available tokens are sold, signaling market closure and triggering liquidity addition to Uniswap.
+     * 
+     * Reverts:
+     * - `MoonUpMarket__INVALID_AMOUNT`: If `msg.value` is zero.
+     * - `MoonUpMarket__FAILED_TRANSACTION`: If the token amount is less than `minExpected`.
+     * - `MoonUpMarket__CANNOT_BUY_MORE_THAN_3_PERCENT`: If the user's new balance exceeds the allowable holding percentage.
+     */
+
     function buy(uint256 minExpected) external marketStatus payable{
         if(msg.value == 0){
             revert MoonUpMarket__INVALID_AMOUNT();
@@ -90,7 +121,6 @@ contract MoonUpMarket is UniswapInteraction {
             revert MoonUpMarket__FAILED_TRANSACTION();
         }
 
-        totalEth += msg.value;
         tokensSoldSoFar += tokenAmount;
         balances[msg.sender] += tokenAmount;
 
@@ -114,12 +144,43 @@ contract MoonUpMarket is UniswapInteraction {
         }
     }
 
+
+    /**
+     * @notice Allows users to sell tokens back to the market in exchange for ETH.
+     * @dev This function handles token-to-ETH transactions, calculates fees, ensures the amount of ETH returned 
+     * meets the `minExpected` threshold, and manages ETH transfers.
+     * @param amount The amount of tokens the user wants to sell.
+     * @param minExpected The minimum amount of ETH the seller expects to receive. The transaction reverts if this threshold is not met.
+     * 
+     * Requirements:
+     * - `amount` must be greater than zero, otherwise the transaction reverts.
+     * - The ETH amount calculated from the token sale must meet or exceed `minExpected` to avoid reverting.
+     * - The fee transfer to the factory must succeed.
+     * 
+     * Processes:
+     * 1. Checks if `amount` is non-zero; reverts if it's zero.
+     * 2. Calculates the ETH equivalent (`ethAmount`) for the given `tokenAmount` and a 1% fee.
+     * 3. Transfers the fee to the factory and ensures the transfer was successful.
+     * 4. Transfers `amount` of tokens from the seller to the contract.
+     * 5. Updates the contract's ETH and token balances and the seller's balance.
+     * 6. Sends the net ETH (after fees) to the seller and ensures the transfer is successful.
+     * 
+     * Emits:
+     * - `Sell`: Emitted when a user successfully sells tokens, showing the seller's address, ETH received, and tokens sold.
+     * 
+     * Reverts:
+     * - `MoonUpMarket__INVALID_AMOUNT`: If `amount` is zero.
+     * - `MoonUpMarket__FAILED_TRANSACTION`: If the calculated ETH amount is less than `minExpected`.
+     * - `Transfer Failed`: If the fee transfer to the factory fails or the ETH transfer to the seller fails.
+     */
+    
     function sell(uint256 amount, uint256 minExpected) external marketStatus{
         if(amount == 0){
             revert MoonUpMarket__INVALID_AMOUNT();
         }
 
         uint256 tokenAmount = amount;
+        tokensSoldSoFar -= tokenAmount;
         uint256 ethAmount = getEthQoute(tokenAmount);
         uint256 fee = (ethAmount) * 10 / 1000;
         uint256 ethAmountAfterFee = ethAmount - fee;
@@ -132,13 +193,43 @@ contract MoonUpMarket is UniswapInteraction {
         }
 
         token.transferFrom(msg.sender, address(this), tokenAmount);
-        totalEth -= ethAmount;
         balances[msg.sender] -= tokenAmount;
-        tokensSoldSoFar -= tokenAmount;
         (bool success,) = payable(msg.sender).call{value: ethAmountAfterFee}("");
         require(success, "transfer failed!");
         emit Sell(msg.sender, ethAmount, tokenAmount);
     }
+    /**
+     * @notice Adds liquidity to a Uniswap V3 pool, sets the initial price, and transfers the NFT position.
+     * @dev This function performs a series of operations to create a Uniswap V3 pool, deposit liquidity, and set up the pool's initial state.
+     * It also handles platform fee transfer and approval of tokens for the position manager.
+     * 
+     * Requirements:
+     * - The contract must have a balance of at least 6 ETH to proceed.
+     * - The transfer of the platform fee to the factory must be successful.
+     * 
+     * Processes:
+     * 1. Ensures the contract's ETH balance is sufficient (>= 6 ETH).
+     * 2. Calculates and transfers a 10% platform cut to the factory.
+     * 3. Deposits 5 ETH as WETH.
+     * 4. Creates a Uniswap V3 pool for the `token` and `weth` with a 0.3% (500) fee tier.
+     * 5. Initializes the pool with a calculated initial price.
+     * 6. Mints a position with desired token and WETH amounts and sets a deadline for minting.
+     * 7. Approves `nonfungiblePositionManager` for token transfers.
+     * 8. Transfers the minted NFT position to address `0` (burns the NFT).
+     * 
+     * Emits:
+     * - `UniswapPoolCreated`: Emitted when a Uniswap pool is successfully created, indicating the pool's address.
+     * 
+     * Reverts:
+     * - If the contract balance is less than 6 ETH.
+     * - If the platform fee transfer to the factory fails.
+     * - If minting the NFT position fails.
+     * 
+     * Notes:
+     * - The `sqrtPrice96` is calculated for initializing the pool with an initial price.
+     * - The tick range is set between `-887272` and `887272`, which represents the full range of possible prices.
+     * 
+     */
 
     function addToUniswap() internal {
         require(address(this).balance >= 6 ether, "Insufficient balance to add to Uniswap");
@@ -178,11 +269,12 @@ contract MoonUpMarket is UniswapInteraction {
         emit UniswapPoolCreated(poolAddress);
         }
 
+
     function withdrawToken() external {
         require(msg.sender == factory, "Only owner can withdraw fees");
         require(!isMarketOpen, "Market is still open");
         uint256 amount = token.balanceOf(address(this));
-        token.transferFrom(address(this), factory, amount);
+        token.transferFrom(address(this), factory,amount);
 
         emit TokenWithdrawn(factory, amount, address(this));
     }

@@ -78,7 +78,7 @@ contract MoonUpMarketUniswapTest is Test {
         }("MoonUP", "MUP", "", 0, false);
     }
 
-    function test_fuzz_deposit() public {
+    function test_deposit() public {
         for (uint256 i; i < 44; i++) {
             address user = generateRandomAddress(newUser); //makeAddr(vm.toString(abi.encodePacked(block.timestamp, block.number + i, i)));
             uint256 balanceBefore = IERC20(MoonUpErc20).balanceOf(user);
